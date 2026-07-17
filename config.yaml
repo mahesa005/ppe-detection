@@ -216,7 +216,7 @@ copy_paste: 0.0
 # ------------------------------------------------------------
 # OUTPUT
 # ------------------------------------------------------------
-project: /
+project: ./runs
 # Root folder where all training runs are saved.
 
 name: ppe_v1
