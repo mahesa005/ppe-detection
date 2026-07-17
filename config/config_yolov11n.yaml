@@ -26,7 +26,7 @@ task: detect
 # ------------------------------------------------------------
 # DATA
 # ------------------------------------------------------------
-data: data/PPR_EXT.v1i.yolov8/data.yaml
+data: ../data/PPR_EXT.v2-raw.yolov11/data.yaml
 # Path to your dataset config. Must contain:
 #   train: path/to/train/images
 #   val:   path/to/valid/images
@@ -219,7 +219,7 @@ copy_paste: 0.0
 project: ./runs
 # Root folder where all training runs are saved.
 
-name: ppe_v1
+name: ppe_v2
 # Subfolder name for this specific run.
 # Increment this for each experiment: ppe_v1, ppe_v2, etc.
 # so you never overwrite previous results.

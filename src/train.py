@@ -1,6 +1,41 @@
 import yaml
 import torch
+import time
+import os
+from datetime import datetime
 from ultralytics import YOLO
+
+
+# ============================================================
+# SEQUENTIAL TRAINING CONFIGURATION
+# ============================================================
+# List of config files to train sequentially
+# Add or remove config paths here
+
+MODELS = [
+    "config/config_yolov11n.yaml",
+    # "config_v2.yaml",
+    # "config_v3.yaml",
+]
+
+# Set to True to skip failed models and continue training remaining ones
+CONTINUE_ON_ERROR = False
+
+
+def _format_duration(seconds):
+    """Convert seconds to HH:MM:SS format"""
+    hours = int(seconds // 3600)
+    minutes = int((seconds % 3600) // 60)
+    secs = int(seconds % 60)
+    return f"{hours}h {minutes}m {secs}s"
+
+
+def _print_header(message):
+    """Print centered section header"""
+    width = 80
+    print("\n" + "=" * width)
+    print(message.center(width))
+    print("=" * width + "\n")
 
 
 def load_config(path="../config.yaml"):
@@ -73,6 +108,92 @@ def build_train_args(cfg):
     return {**base_args, **aug_args}
 
 
+def train_single_model(config_path):
+    """Train a single model with given config file"""
+    try:
+        # Validate config exists
+        if not os.path.exists(config_path):
+            raise FileNotFoundError(f"Config file not found: {config_path}")
+
+        # Load config
+        cfg = load_config(config_path)
+        train_args = build_train_args(cfg)
+
+        # Print model info
+        print(f"\n   Model     : {cfg['model']}")
+        print(f"   Dataset   : {cfg['data']}")
+        print(f"   Epochs    : {cfg['epochs']}")
+        print(f"   Batch     : {cfg['batch']}")
+        print(f"   Image size: {cfg['imgsz']}")
+        print(f"   Output    : {cfg['project']}/{cfg['name']}\n")
+
+        # Train
+        start_time = time.time()
+        model = YOLO(cfg["model"])
+        results = model.train(**train_args)
+        duration = time.time() - start_time
+
+        # Print results
+        print(f"\n   Duration  : {_format_duration(duration)}")
+        print(f"   Best model: {results.save_dir}/weights/best.pt")
+        print(f"   Last model: {results.save_dir}/weights/last.pt")
+
+        return {
+            "success": True,
+            "config": config_path,
+            "duration": duration,
+            "results_dir": results.save_dir,
+            "error": None
+        }
+
+    except Exception as e:
+        duration = time.time() - start_time if 'start_time' in locals() else 0
+        print(f"\n   ✗ ERROR: {str(e)}")
+        return {
+            "success": False,
+            "config": config_path,
+            "duration": duration,
+            "results_dir": None,
+            "error": str(e)
+        }
+
+
+def train_all_models():
+    """Train all models in MODELS array sequentially"""
+    if not MODELS:
+        print("No models configured. Add models to MODELS array in train.py")
+        return
+
+    _print_header(f"STARTING SEQUENTIAL TRAINING - {len(MODELS)} models")
+
+    results = []
+    total_start = time.time()
+
+    for idx, config_path in enumerate(MODELS, 1):
+        print(f"[{idx}/{len(MODELS)}] Training: {config_path}")
+
+        result = train_single_model(config_path)
+        results.append(result)
+
+        if not result["success"] and not CONTINUE_ON_ERROR:
+            print(f"\n✗ Training failed. Set CONTINUE_ON_ERROR=True to skip and train remaining models.")
+            raise Exception(f"Training failed for {config_path}: {result['error']}")
+
+    total_duration = time.time() - total_start
+
+    # Print summary
+    _print_header("TRAINING COMPLETE")
+    successful = sum(1 for r in results if r["success"])
+    print(f"Models trained: {successful}/{len(MODELS)}")
+    print(f"Total time: {_format_duration(total_duration)}\n")
+
+    for r in results:
+        status = "✓" if r["success"] else "✗"
+        print(f"  {status} {r['config']} ({_format_duration(r['duration'])})")
+
+    print()
+
+
 def main():
     # GPU check
     if torch.cuda.is_available():
@@ -81,27 +202,8 @@ def main():
     else:
         print("No GPU detected — training on CPU will be very slow")
 
-    # Load config
-    cfg = load_config("config.yaml")
-    train_args = build_train_args(cfg)
-
-    print(f"\nTraining config:")
-    print(f"   Model     : {cfg['model']}")
-    print(f"   Dataset   : {cfg['data']}")
-    print(f"   Epochs    : {cfg['epochs']}")
-    print(f"   Batch     : {cfg['batch']}")
-    print(f"   Image size: {cfg['imgsz']}")
-    print(f"   Output    : {cfg['project']}/{cfg['name']}\n")
-
-    # Load model and train
-    model = YOLO(cfg["model"])
-    results = model.train(**train_args)
-
-    print(f"\n Training complete")
-    print(f"   Best model : {results.save_dir}/weights/best.pt")
-    print(f"   Last model : {results.save_dir}/weights/last.pt")
-    print(f"\n To evaluate:")
-    print(f"   yolo val model={results.save_dir}/weights/best.pt data={cfg['data']}")
+    # Train all configured models sequentially
+    train_all_models()
 
 
 if __name__ == "__main__":
