@@ -1,0 +1,243 @@
+# ============================================================
+# PPE Detection — YOLO Training Configuration
+# Project   : edge-ppe-cctv
+# Author    : Mahesa
+# ============================================================
+# AUGMENTATION TOGGLE
+# Set to true if you did NOT augment in Roboflow (let YOLO handle it)
+# Set to false if you already augmented in Roboflow (avoid double augmentation)
+use_augmentation: false  # <-- toggle this
+
+
+# ------------------------------------------------------------
+# MODEL
+# ------------------------------------------------------------
+model: yolo11n.pt
+# yolo11n = nano  → fastest, least accurate, best for edge (Jetson/Pi)
+# yolo11s = small → slight accuracy boost, still edge-friendly
+# yolo11m = medium → better accuracy, heavier, for server-side
+# Start with nano, scale up only if mAP is insufficient after full training
+
+task: detect
+# Options: detect | segment | classify | pose
+# detect = standard bounding box detection, which is what we need
+
+
+# ------------------------------------------------------------
+# DATA
+# ------------------------------------------------------------
+data: data/PPR_EXT.v1i.yolov8/data.yaml
+# Path to your dataset config. Must contain:
+#   train: path/to/train/images
+#   val:   path/to/valid/images
+#   nc:    7  (number of classes)
+#   names: [helmet, no_helmet, vest, no_vest, boots, no_boots, person]
+
+
+# ------------------------------------------------------------
+# TRAINING CORE
+# ------------------------------------------------------------
+epochs: 20
+# How many full passes through the training dataset.
+# 20 is a good starting point for initial training. If mAP is still improving
+# at epoch 20, increase to 50-100. If it plateaus at epoch 10,
+# early stopping (patience) will handle it.
+
+imgsz: 640
+# Input image size (pixels). All images resized to 640x640.
+# 640 is the YOLO standard — balances detection of small objects
+# (boots at the bottom of frame) vs inference speed on edge hardware.
+# Increase to 1280 only if boots are consistently missed and you
+# have the VRAM to support it.
+
+batch: 16
+# Images processed per gradient update step.
+# RTX 4050 (6GB VRAM) handles batch=16 comfortably at imgsz=640.
+# If you get CUDA out of memory errors, drop to batch=8.
+# Larger batch = more stable gradients but more VRAM required.
+
+device: 0
+# 0 = first GPU (your RTX 4050)
+# 'cpu' = CPU only (much slower, avoid for training)
+# '0,1' = multi-GPU (if you had two GPUs)
+
+workers: 8
+# CPU threads used to load data in parallel while GPU trains.
+# 8 is safe for most machines. Drop to 4 if you get
+# DataLoader errors or system feels sluggish during training.
+
+patience: 3
+# Early stopping: stop training if mAP doesn't improve
+# for this many consecutive epochs.
+# Prevents wasting time if model has already converged.
+# 3 means "wait 3 epochs before giving up on improvement"
+
+
+# ------------------------------------------------------------
+# OPTIMIZER
+# ------------------------------------------------------------
+optimizer: AdamW
+# AdamW = Adam with decoupled weight decay. Best default for YOLO.
+# SGD is an alternative — sometimes better for final fine-tuning
+# but needs more careful LR tuning. Stick with AdamW for first run.
+
+lr0: 0.01
+# Initial learning rate. How big a step the optimizer takes
+# when updating weights. Too high = unstable training (loss spikes).
+# Too low = very slow convergence. 0.01 is YOLO's proven default.
+
+lrf: 0.01
+# Final learning rate as a fraction of lr0.
+# The scheduler multiplies lr0 by lrf at the end of training.
+# lrf=0.01 means final LR = 0.01 * 0.01 = 0.0001
+# Learning rate decays over training so the model makes
+# finer adjustments as it converges.
+
+momentum: 0.937
+# Carries a fraction of the previous gradient update forward.
+# Helps the optimizer move through flat regions and avoid
+# getting stuck in local minima. 0.937 is YOLO's battle-tested default.
+
+weight_decay: 0.0005
+# L2 regularisation — penalises large weights to prevent overfitting.
+# Forces the model to learn simpler, more generalisable features
+# rather than memorising training images.
+# 0.0005 is standard. Increase if you see training mAP >> val mAP
+# (a sign of overfitting).
+
+
+# ------------------------------------------------------------
+# WARMUP
+# ------------------------------------------------------------
+warmup_epochs: 3
+# For the first 3 epochs, learning rate starts very small and
+# ramps up to lr0. Prevents unstable updates at the start of
+# training when weights are randomly initialised and gradients
+# are chaotic.
+
+warmup_momentum: 0.8
+# Momentum value used during warmup phase only.
+# Lower than main momentum (0.937) to keep early updates conservative.
+
+warmup_bias_lr: 0.1
+# Separate higher LR for bias parameters during warmup.
+# Bias terms need to initialise faster than weights.
+
+
+# ------------------------------------------------------------
+# LOSS WEIGHTS
+# ------------------------------------------------------------
+box: 7.5
+# Weight applied to bounding box regression loss (CIoU).
+# Controls how much the model prioritises getting box coordinates right.
+# Higher = tighter boxes but may hurt classification.
+# 7.5 is YOLO11's default — well tuned for general detection.
+# If your boxes are consistently loose, increase slightly to 8.0-9.0.
+
+cls: 0.5
+# Weight applied to classification loss (Varifocal Loss).
+# Controls how much the model prioritises getting the class right
+# (helmet vs no_helmet vs vest etc).
+# 0.5 is standard. If you're seeing class confusion in results,
+# increase to 0.75-1.0.
+
+dfl: 1.5
+# Weight applied to Distribution Focal Loss.
+# Controls precision of predicted box edge distributions.
+# Higher = more precise box edges, especially important for
+# small objects like boots. 1.5 is YOLO11's default.
+
+
+# ------------------------------------------------------------
+# AUGMENTATION
+# Only applied if use_augmentation: true above
+# If you augmented in Roboflow, set use_augmentation: false
+# ------------------------------------------------------------
+
+# Colour augmentations — simulate different lighting/cameras
+hsv_h: 0.015
+# Randomly shifts image hue by ±1.5%.
+# Handles different camera white balance and lighting colour casts.
+
+hsv_s: 0.7
+# Randomly shifts saturation by ±70%.
+# Simulates washed-out indoor lighting vs vivid outdoor sunlight.
+
+hsv_v: 0.4
+# Randomly shifts brightness (value) by ±40%.
+# Handles day/night shifts, shadows, overcast vs sunny conditions.
+
+# Geometric augmentations — simulate camera position variation
+fliplr: 0.5
+# 50% chance of horizontal flip per image.
+# Workers appear from both directions in CCTV footage.
+# Doubles effective dataset size for free.
+
+flipud: 0.0
+# Vertical flip — disabled.
+# Upside-down workers don't exist in real CCTV deployment.
+# Would waste model capacity learning impossible orientations.
+
+degrees: 0.0
+# Random rotation in degrees. Disabled because:
+# 1. Auto-orient already handles EXIF rotation
+# 2. CCTV cameras are fixed — workers are always upright
+# Enable (e.g. degrees: 5.0) only if your camera can tilt
+
+translate: 0.1
+# Randomly shifts image by ±10% horizontally and vertically.
+# Simulates workers at different positions within the camera frame.
+
+scale: 0.2
+# Randomly zooms in/out by ±20%.
+# Simulates workers at different distances from the camera.
+# Critical for boots detection — boots appear very small when
+# the worker is far from the camera.
+
+mosaic: 1.0
+# Combines 4 training images into one frame.
+# Forces the model to detect objects at smaller scales.
+# Massively helps small object detection (boots at bottom of frame).
+# Set to 0.0 if already applied in Roboflow.
+
+
+# Advanced augmentations (off by default for first run)
+mixup: 0.0
+# Blends two images together at a random ratio.
+# Can help generalisation but makes training harder to debug.
+# Enable in later runs if overfitting persists.
+
+copy_paste: 0.0
+# Copies objects from one image and pastes into another.
+# Useful for rare classes — could help no_boots (low count).
+# Leave off for first run.
+
+
+# ------------------------------------------------------------
+# OUTPUT
+# ------------------------------------------------------------
+project: /
+# Root folder where all training runs are saved.
+
+name: ppe_v1
+# Subfolder name for this specific run.
+# Increment this for each experiment: ppe_v1, ppe_v2, etc.
+# so you never overwrite previous results.
+
+save: true
+# Save model checkpoints during training.
+# Always keep true — you want best.pt and last.pt saved.
+
+save_period: 3
+# Save a checkpoint every 10 epochs in addition to best/last.
+# Useful if training crashes — you can resume from epoch 90
+# instead of starting over.
+
+exist_ok: false
+# If false, creates a new folder (ppe_v1_2, ppe_v1_3 etc)
+# if the name already exists. Prevents accidentally
+# overwriting a previous run's results.
+
+verbose: true
+# Print detailed logs during training.
+# Keep true so you can monitor loss and mAP per epoch.
