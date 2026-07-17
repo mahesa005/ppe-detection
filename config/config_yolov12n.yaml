@@ -12,10 +12,10 @@ use_augmentation: false  # <-- toggle this
 # ------------------------------------------------------------
 # MODEL
 # ------------------------------------------------------------
-model: yolo11n.pt
-# yolo11n = nano  → fastest, least accurate, best for edge (Jetson/Pi)
-# yolo11s = small → slight accuracy boost, still edge-friendly
-# yolo11m = medium → better accuracy, heavier, for server-side
+model: yolo12n.pt
+# yolo12n = nano  → fastest, least accurate, best for edge (Jetson/Pi)
+# yolo12s = small → slight accuracy boost, still edge-friendly
+# yolo12m = medium → better accuracy, heavier, for server-side
 # Start with nano, scale up only if mAP is insufficient after full training
 
 task: detect

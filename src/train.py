@@ -14,8 +14,14 @@ from ultralytics import YOLO
 
 MODELS = [
     "config/config_yolov11n.yaml",
-    # "config_v2.yaml",
-    # "config_v3.yaml",
+    "config/config_yolov11s.yaml",
+    "config/config_yolov11m.yaml",
+    "config/config_yolov12n.yaml",
+    "config/config_yolov12s.yaml",
+    "config/config_yolov12m.yaml",
+    "config/config_yolo26n.yaml",
+    "config/config_yolo26s.yaml",
+    "config/config_yolo26m.yaml",
 ]
 
 # Set to True to skip failed models and continue training remaining ones
