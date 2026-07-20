@@ -228,10 +228,14 @@ save: true
 # Save model checkpoints during training.
 # Always keep true — you want best.pt and last.pt saved.
 
-save_period: 3
+save_period: 0
 # Save a checkpoint every 10 epochs in addition to best/last.
 # Useful if training crashes — you can resume from epoch 90
 # instead of starting over.
+
+plots: false
+# Disable visualization outputs (train_batch*.jpg, val_batch*.jpg, etc)
+# Only saves weights and results.csv
 
 exist_ok: false
 # If false, creates a new folder (ppe_v1_2, ppe_v1_3 etc)
