@@ -6,7 +6,7 @@
 # AUGMENTATION TOGGLE
 # Set to true if you did NOT augment in Roboflow (let YOLO handle it)
 # Set to false if you already augmented in Roboflow (avoid double augmentation)
-use_augmentation: false  # <-- toggle this
+use_augmentation: true  # <-- toggle this
 
 
 # ------------------------------------------------------------
@@ -216,7 +216,7 @@ copy_paste: 0.0
 # ------------------------------------------------------------
 # OUTPUT
 # ------------------------------------------------------------
-project: ./runs
+project: ./runs/detect
 # Root folder where all training runs are saved.
 
 name: ppe_v2
