@@ -1,0 +1,145 @@
+==============================================================================
+                 GROUNDING DINO AUTO-LABELER - QUICK START
+==============================================================================
+
+WHAT WAS CREATED:
+  1. scripts/autolabel_persons.py (9.5 KB)
+  2. scripts/autolabel_shoes.py (13 KB)
+  3. AUTOLABEL_README.md (comprehensive guide)
+
+DEPENDENCIES INSTALLED:
+  - transformers (for Grounding DINO)
+  - supervision (for NMS and bbox utilities)
+
+==============================================================================
+                              STEP-BY-STEP GUIDE
+==============================================================================
+
+STEP 1: TEST ON A SMALL SAMPLE (20 images)
+-----------
+  python scripts/autolabel_persons.py --limit 20
+
+  Expected output:
+    data/cleaned_fragment_1/persons_supplemented/
+    ├── images/ (20 copied JPGs)
+    ├── labels/ (20 .txt files with supplemented person annotations)
+    └── data.yaml (nc=5, unchanged)
+
+STEP 2: TEST SHOE LABELING (on those same 20 images)
+-----------
+  python scripts/autolabel_shoes.py --limit 20
+
+  Expected output:
+    data/cleaned_fragment_1/ppe_7class_export/
+    ├── images/ (20 copied JPGs)
+    ├── labels/ (20 .txt files with 7-class format)
+    └── data.yaml (nc=7, with Safety Boots + NO-Safety Boots)
+
+STEP 3: VISUALLY INSPECT OUTPUT
+-----------
+  1. Open a few output label files in a text editor
+  2. Check that class IDs are correct (0-6)
+  3. Verify bboxes have proper normalized coordinates (0-1)
+
+STEP 4: RUN ON ALL 12,319 IMAGES
+-----------
+  python scripts/autolabel_persons.py --overwrite
+  python scripts/autolabel_shoes.py --overwrite
+
+  Full run will take ~30-60 min depending on GPU/CPU.
+  Progress bar will show real-time stats.
+
+==============================================================================
+                            CONFIGURATION OPTIONS
+==============================================================================
+
+autolabel_persons.py:
+  --src DIR             Source dataset (default: data/cleaned_fragment_1/ppe_curated_export)
+  --dst DIR             Output directory (default: data/cleaned_fragment_1/persons_supplemented)
+  --box-thresh FLOAT    GDINO box confidence (default: 0.35, range 0-1)
+  --iou-thresh FLOAT    IoU threshold to skip overlap (default: 0.5)
+  --limit N             Process only first N images (for testing)
+  --overwrite           Delete and recreate output directory
+
+autolabel_shoes.py:
+  --src DIR             Source dataset (default: data/cleaned_fragment_1/persons_supplemented)
+  --dst DIR             Output directory (default: data/cleaned_fragment_1/ppe_7class_export)
+  --box-thresh FLOAT    GDINO box confidence for shoes (default: 0.30)
+  --nms-thresh FLOAT    NMS IoU threshold (default: 0.45)
+  --foot-ratio FLOAT    Foot region height as fraction of person (default: 0.25)
+  --limit N             Process only first N images
+  --overwrite           Delete and recreate output directory
+
+==============================================================================
+                           OUTPUT FORMAT (7-CLASS)
+==============================================================================
+
+Class ID | Class Name
+---------|---------------
+0        | Hardhat
+1        | NO-Hardhat
+2        | NO-Safety Vest
+3        | Person
+4        | Safety Vest
+5        | Safety Boots       <-- NEW
+6        | NO-Safety Boots    <-- NEW
+
+YOLO label format:
+  <class_id> <cx> <cy> <w> <h>
+  
+  Example:
+    3 0.5 0.3 0.2 0.4    # Person at normalized coordinates
+    5 0.45 0.65 0.1 0.08 # Safety Boots
+    6 0.5 0.75 0.15 0.1  # NO-Safety Boots (inferred from foot region)
+
+==============================================================================
+                          NEXT STEPS AFTER LABELING
+==============================================================================
+
+1. VALIDATE:
+   - Spot-check ~50 images with visualized bboxes
+   - Run: python -c "from PIL import Image, ImageDraw; import random; ..." (create a visualization script)
+
+2. TRAIN:
+   - Update config/config_yolov12n.yaml: data: ./data/cleaned_fragment_1/ppe_7class_export/data.yaml
+   - Run: python src/train.py
+
+3. EVALUATE:
+   - Use scripts/class_metrics.py to check per-class performance
+   - Use scripts/benchmark_report.py to compare vs 5-class baseline
+
+==============================================================================
+                              TROUBLESHOOTING
+==============================================================================
+
+ERROR: "Module not found: transformers"
+  → Run: .venv/Scripts/pip install transformers supervision
+
+ERROR: Out of memory (OOM)
+  → Grounding DINO is running on GPU but doesn't fit
+  → Edit scripts to force CPU: device = "cpu"
+
+ERROR: "Expected all tensors to be on the same device"
+  → Mixed CPU/GPU issue, ensure all models/images on same device
+  → Should be auto-handled, but check get_device() function
+
+SLOW PROCESSING:
+  → Grounding DINO is CPU-bound on first image (model download)
+  → Subsequent images should be faster (GPU inference)
+  → For quick test, use --limit 10 (takes ~2-5 min)
+
+TOO MANY FALSE POSITIVES:
+  → Raise --box-thresh (e.g., 0.45 instead of 0.30 for shoes)
+  → This filters low-confidence detections
+
+TOO FEW DETECTIONS:
+  → Lower --box-thresh (e.g., 0.20)
+  → Try different text prompts in the script
+
+==============================================================================
+                           FOR MORE DETAILS
+==============================================================================
+
+See: AUTOLABEL_README.md (full documentation with examples)
+
+==============================================================================

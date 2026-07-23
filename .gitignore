@@ -223,3 +223,6 @@ runs/
 !runs/detect/**/*.pt
 !runs/detect/**/args.yaml
 !runs/detect/**/results.csv
+
+.venv_camera
+*.db
